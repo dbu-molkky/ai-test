@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>モルックフォームAI</title>
+  <style>
+    body {
+      margin: 0;
+      background: #f9f9f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      color: #111;
+      text-align: center;
+    }
+    h1 {
+      font-weight: 600;
+      font-size: 1.8em;
+      margin: 20px 0;
+    }
+    video, canvas {
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%) scaleX(-1);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    }
+    #feedback {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #ffffffcc;
+      padding: 1em;
+      font-size: 1.1em;
+      line-height: 1.5;
+      backdrop-filter: blur(8px);
+      color: #111;
+      box-shadow: 0 -1px 6px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <h1>モルック投球フォームAI</h1>
+  <video id="video" width="640" height="480" autoplay playsinline muted></video>
+  <canvas id="canvas" width="640" height="480"></canvas>
+  <div id="feedback">フォームを検出中です...</div>
+
+  <!-- MediaPipe -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const feedback = document.getElementById('feedback');
+
+    function calculateAngle(a, b, c) {
+      const ab = [b.x - a.x, b.y - a.y];
+      const cb = [b.x - c.x, b.y - c.y];
+      const dot = ab[0] * cb[0] + ab[1] * cb[1];
+      const abLen = Math.hypot(...ab);
+      const cbLen = Math.hypot(...cb);
+      return (Math.acos(dot / (abLen * cbLen)) * 180 / Math.PI).toFixed(1);
+    }
+
+    const pose = new Pose({
+      locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
+
+    pose.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      enableSegmentation: false,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    pose.onResults(results => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!results.poseLandmarks) {
+        feedback.innerText = 'フォームを検出できませんでした';
+        return;
+      }
+
+      const lm = results.poseLandmarks;
+      const joints = {
+        "左ひじ": calculateAngle(lm[11], lm[13], lm[15]),
+        "右ひじ": calculateAngle(lm[12], lm[14], lm[16]),
+        "左肩":   calculateAngle(lm[13], lm[11], lm[23]),
+        "右肩":   calculateAngle(lm[14], lm[12], lm[24]),
+        "左ひざ": calculateAngle(lm[23], lm[25], lm[27]),
+        "右ひざ": calculateAngle(lm[24], lm[26], lm[28]),
+      };
+
+      let messages = [];
+      for (const [name, angle] of Object.entries(joints)) {
+        messages.push(`${name}の角度: ${angle}°`);
+        const ang = parseFloat(angle);
+        if (ang < 130) {
+          messages.push(`→ ${name}が曲がりすぎています`);
+        } else if (ang > 170) {
+          messages.push(`→ ${name}が伸びすぎている可能性あり`);
+        } else {
+          messages.push(`→ ${name}の角度は良好です`);
+        }
+      }
+
+      feedback.innerText = messages.join('\n');
+
+      for (const {x, y} of Object.values(lm)) {
+        ctx.beginPath();
+        ctx.arc(x * canvas.width, y * canvas.height, 4, 0, 2 * Math.PI);
+        ctx.fillStyle = '#007aff'; // Apple風ブルー
+        ctx.fill();
+      }
+    });
+
+    const camera = new Camera(video, {
+      onFrame: async () => {
+        await pose.send({ image: video });
+      },
+      width: 640,
+      height: 480
+    });
+    camera.start();
+  </script>
+</body>
+</html>
