@@ -3,129 +3,121 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>モルックフォームAI</title>
+  <title>モルックフォーム比較</title>
   <style>
     body {
-      margin: 0;
-      background: #f9f9f9;
       font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      background: #f9f9f9;
       color: #111;
       text-align: center;
+      padding: 1em;
     }
     h1 {
-      font-weight: 600;
       font-size: 1.8em;
-      margin: 20px 0;
+      margin-bottom: 0.5em;
+    }
+    .video-container {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 1em;
     }
     video, canvas {
-      position: absolute;
-      top: 60px;
-      left: 50%;
-      transform: translateX(-50%) scaleX(-1);
+      width: 300px;
+      height: 220px;
       border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
     }
-    #feedback {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      background: #ffffffcc;
-      padding: 1em;
-      font-size: 1.1em;
-      line-height: 1.5;
-      backdrop-filter: blur(8px);
-      color: #111;
-      box-shadow: 0 -1px 6px rgba(0,0,0,0.1);
+    input[type="file"] {
+      margin: 0.5em 0;
     }
   </style>
 </head>
 <body>
-  <h1>モルック投球フォームAI</h1>
-  <video id="video" width="640" height="480" autoplay playsinline muted></video>
-  <canvas id="canvas" width="640" height="480"></canvas>
-  <div id="feedback">フォームを検出中です...</div>
+  <h1>モルック投球フォーム比較</h1>
+
+  <div>
+    <h2>① プロ動画アップロード</h2>
+    <input type="file" id="proUpload" accept="video/*">
+    <video id="proVideo" controls></video>
+    <canvas id="proCanvas"></canvas>
+  </div>
+
+  <div>
+    <h2>② 自分の投球動画アップロード</h2>
+    <input type="file" id="userUpload" accept="video/*">
+    <video id="userVideo" controls></video>
+    <canvas id="userCanvas"></canvas>
+  </div>
 
   <!-- MediaPipe -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 
   <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const feedback = document.getElementById('feedback');
+    const setupPoseProcessing = (videoElem, canvasElem, label) => {
+      const ctx = canvasElem.getContext('2d');
+      const pose = new Pose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+      });
 
-    function calculateAngle(a, b, c) {
-      const ab = [b.x - a.x, b.y - a.y];
-      const cb = [b.x - c.x, b.y - c.y];
-      const dot = ab[0] * cb[0] + ab[1] * cb[1];
-      const abLen = Math.hypot(...ab);
-      const cbLen = Math.hypot(...cb);
-      return (Math.acos(dot / (abLen * cbLen)) * 180 / Math.PI).toFixed(1);
-    }
+      pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
 
-    const pose = new Pose({
-      locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-    });
+      pose.onResults(results => {
+        ctx.clearRect(0, 0, canvasElem.width, canvasElem.height);
+        if (results.poseLandmarks) {
+          drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#007aff', lineWidth: 3});
+          drawLandmarks(ctx, results.poseLandmarks, {color: '#111', radius: 2});
+        }
+      });
 
-    pose.setOptions({
-      modelComplexity: 1,
-      smoothLandmarks: true,
-      enableSegmentation: false,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
-    });
-
-    pose.onResults(results => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (!results.poseLandmarks) {
-        feedback.innerText = 'フォームを検出できませんでした';
-        return;
-      }
-
-      const lm = results.poseLandmarks;
-      const joints = {
-        "左ひじ": calculateAngle(lm[11], lm[13], lm[15]),
-        "右ひじ": calculateAngle(lm[12], lm[14], lm[16]),
-        "左肩":   calculateAngle(lm[13], lm[11], lm[23]),
-        "右肩":   calculateAngle(lm[14], lm[12], lm[24]),
-        "左ひざ": calculateAngle(lm[23], lm[25], lm[27]),
-        "右ひざ": calculateAngle(lm[24], lm[26], lm[28]),
+      const onFrame = async () => {
+        if (!videoElem.paused && !videoElem.ended) {
+          await pose.send({ image: videoElem });
+          requestAnimationFrame(onFrame);
+        }
       };
 
-      let messages = [];
-      for (const [name, angle] of Object.entries(joints)) {
-        messages.push(`${name}の角度: ${angle}°`);
-        const ang = parseFloat(angle);
-        if (ang < 130) {
-          messages.push(`→ ${name}が曲がりすぎています`);
-        } else if (ang > 170) {
-          messages.push(`→ ${name}が伸びすぎている可能性あり`);
-        } else {
-          messages.push(`→ ${name}の角度は良好です`);
-        }
-      }
+      videoElem.onplay = () => {
+        canvasElem.width = videoElem.videoWidth;
+        canvasElem.height = videoElem.videoHeight;
+        onFrame();
+      };
+    };
 
-      feedback.innerText = messages.join('\n');
-
-      for (const {x, y} of Object.values(lm)) {
-        ctx.beginPath();
-        ctx.arc(x * canvas.width, y * canvas.height, 4, 0, 2 * Math.PI);
-        ctx.fillStyle = '#007aff'; // Apple風ブルー
-        ctx.fill();
-      }
+    // ファイルアップロード処理
+    document.getElementById('proUpload').addEventListener('change', e => {
+      const file = e.target.files[0];
+      const video = document.getElementById('proVideo');
+      video.src = URL.createObjectURL(file);
+      video.load();
     });
 
-    const camera = new Camera(video, {
-      onFrame: async () => {
-        await pose.send({ image: video });
-      },
-      width: 640,
-      height: 480
+    document.getElementById('userUpload').addEventListener('change', e => {
+      const file = e.target.files[0];
+      const video = document.getElementById('userVideo');
+      video.src = URL.createObjectURL(file);
+      video.load();
     });
-    camera.start();
+
+    // Pose処理をセットアップ
+    window.onload = () => {
+      setupPoseProcessing(
+        document.getElementById('proVideo'),
+        document.getElementById('proCanvas'),
+        'プロ'
+      );
+      setupPoseProcessing(
+        document.getElementById('userVideo'),
+        document.getElementById('userCanvas'),
+        '自分'
+      );
+    };
   </script>
 </body>
 </html>
