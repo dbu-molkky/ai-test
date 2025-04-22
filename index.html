@@ -50,7 +50,7 @@
     <canvas id="userCanvas"></canvas>
   
   <div id="resultBox" style="margin-top: 2em; font-size: 1.4em; font-weight: bold; color: red;">
-    フォーム近似度：-
+    フォーム近似度：0.0%
   </div>
 
   <!-- MediaPipe -->
@@ -107,7 +107,7 @@
       videoElem.onended = () => {
         if (label === '自分') {
           const similarity = calculateSimilarity(proLandmarksArray, userLandmarksArray);
-          document.getElementById("resultBox").innerText = `フォーム一致度: ${similarity.toFixed(1)}%`;
+          document.getElementById("resultBox").innerText = `フォーム近似度: ${similarity.toFixed(1)}%`;
         }
       };
     };
