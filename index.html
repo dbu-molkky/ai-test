@@ -55,6 +55,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 
   <script>
+    let proLandmarksArray = [];
+    let userLandmarksArray = [];
+
     const setupPoseProcessing = (videoElem, canvasElem, label) => {
       const ctx = canvasElem.getContext('2d');
       const pose = new Pose({
@@ -73,6 +76,14 @@
         if (results.poseLandmarks) {
           drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#007aff', lineWidth: 3});
           drawLandmarks(ctx, results.poseLandmarks, {color: '#111', radius: 2});
+
+          const frameData = results.poseLandmarks.map(pt => [pt.x, pt.y, pt.z]);
+
+          if (label === 'プロ') {
+            proLandmarksArray.push(frameData);
+          } else {
+            userLandmarksArray.push(frameData);
+          }
         }
       });
 
@@ -88,9 +99,38 @@
         canvasElem.height = videoElem.videoHeight;
         onFrame();
       };
+
+      videoElem.onended = () => {
+        if (label === '自分') {
+          const similarity = calculateSimilarity(proLandmarksArray, userLandmarksArray);
+          alert(`フォーム一致度: ${similarity.toFixed(1)}%`);
+        }
+      };
     };
 
-    // ファイルアップロード処理
+    const calculateSimilarity = (proFrames, userFrames) => {
+      const minFrames = Math.min(proFrames.length, userFrames.length);
+      let totalDiff = 0;
+      let count = 0;
+
+      for (let i = 0; i < minFrames; i++) {
+        const proFrame = proFrames[i];
+        const userFrame = userFrames[i];
+
+        for (let j = 0; j < proFrame.length; j++) {
+          const [px, py, pz] = proFrame[j];
+          const [ux, uy, uz] = userFrame[j];
+          const dist = Math.sqrt((px - ux)**2 + (py - uy)**2 + (pz - uz)**2);
+          totalDiff += dist;
+          count++;
+        }
+      }
+
+      const avgDiff = totalDiff / count;
+      const similarity = Math.max(0, 100 - avgDiff * 100);
+      return similarity;
+    };
+
     document.getElementById('proUpload').addEventListener('change', e => {
       const file = e.target.files[0];
       const video = document.getElementById('proVideo');
@@ -105,7 +145,6 @@
       video.load();
     });
 
-    // Pose処理をセットアップ
     window.onload = () => {
       setupPoseProcessing(
         document.getElementById('proVideo'),
