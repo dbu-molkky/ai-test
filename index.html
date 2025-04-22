@@ -39,18 +39,22 @@
   <div>
     <h2>① プロ動画アップロード</h2>
     <input type="file" id="proUpload" accept="video/*">
-    <video id="proVideo" controls></video>
+    <video id="proVideo" controls playsinline></video>
     <canvas id="proCanvas"></canvas>
   </div>
 
   <div>
     <h2>② 自分の投球動画アップロード</h2>
     <input type="file" id="userUpload" accept="video/*">
-    <video id="userVideo" controls></video>
+    <video id="userVideo" controls playsinline></video>
     <canvas id="userCanvas"></canvas>
+  
+  <div id="resultBox" style="margin-top: 2em; font-size: 1.4em; font-weight: bold; color: #007aff;">
+    フォーム一致度: -
   </div>
 
   <!-- MediaPipe -->
+    
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 
@@ -103,7 +107,7 @@
       videoElem.onended = () => {
         if (label === '自分') {
           const similarity = calculateSimilarity(proLandmarksArray, userLandmarksArray);
-          alert(`フォーム一致度: ${similarity.toFixed(1)}%`);
+          document.getElementById("resultBox").innerText = `フォーム一致度: ${similarity.toFixed(1)}%`;
         }
       };
     };
