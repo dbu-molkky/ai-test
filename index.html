@@ -34,23 +34,24 @@
   </style>
 </head>
 <body>
-  <h1>モルック投擲フォーム比較</h1>
+  <h1>投擲フォーム比較システム</h1>
 
   <div>
-    <h2>目標フォーム動画</h2>
+    <h2>目標投擲フォーム</h2>
     <input type="file" id="proUpload" accept="video/*">
     <video id="proVideo" controls playsinline></video>
     <canvas id="proCanvas"></canvas>
   </div>
-
+  <p>　</p>
+  <p>　</p>
   <div>
-    <h2>比較フォーム動画</h2>
+    <h2>私の投擲フォーム</h2>
     <input type="file" id="userUpload" accept="video/*">
     <video id="userVideo" controls playsinline></video>
     <canvas id="userCanvas"></canvas>
   
   <div id="resultBox" style="margin-top: 2em; font-size: 1.4em; font-weight: bold; color: red;">
-    フォーム近似度：0.0%
+    投擲フォーム近似度：0.0%
   </div>
 
   <!-- MediaPipe -->
@@ -107,7 +108,7 @@
       videoElem.onended = () => {
         if (label === '自分') {
           const similarity = calculateSimilarity(proLandmarksArray, userLandmarksArray);
-          document.getElementById("resultBox").innerText = `フォーム近似度: ${similarity.toFixed(1)}%`;
+          document.getElementById("resultBox").innerText = `投擲フォーム近似度: ${similarity.toFixed(1)}%`;
         }
       };
     };
